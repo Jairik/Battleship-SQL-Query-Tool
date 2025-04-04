@@ -43,5 +43,80 @@ WHERE Outcomes.battle = 'Guadalcanal';
 | Washington |        37000 |       9 |
 +------------+--------------+---------+
 2 rows in set (0.00 sec)
+*/
 
+/* Q3 - List all the ships mentioned in the database */
+
+SELECT Ships.name FROM Ships
+UNION
+SELECT ship from Outcomes;
+
+/* Output:
++-----------------+
+| name            |
++-----------------+
+| California      |
+| Haruna          |
+| Hiei            |
+| Iowa            |
+| Kirishima       |
+| Kongo           |
+| Missouri        |
+| Musashi         |
+| New Jersey      |
+| North Carolina  |
+| Ramillies       |
+| Renown          |
+| Repulse         |
+| Resolution      |
+| Revenge         |
+| Royal Oak       |
+| Royal Sovereign |
+| Tennessee       |
+| Washington      |
+| Wisconsin       |
+| Yamato          |
+| Arizona         |
+| Bismarck        |
+| Duke of York    |
+| Fuso            |
+| Hood            |
+| King George V   |
+| Prince of Wales |
+| Rodney          |
+| Scharnhorst     |
+| South Dakota    |
+| West Virginia   |
+| Yamashiro       |
++-----------------+
+33 rows in set (0.00 sec)
+*/
+
+/* Q4 - Find countries that have both battleships and battlecruisiers */
+SELECT Classes.country
+FROM Classes
+WHERE Classes.type = 'bb' AND Classes.country IN
+    (SELECT Classes.country FROM Classes
+    WHERE Classes.type = 'bc');
+
+/* Output:
++-------------+
+| country     |
++-------------+
+| Gt. Britain |
+| Japan       |
++-------------+
+2 rows in set (0.00 sec)
+*/
+
+/* Q5 - Find battles with at least three ships of the same country */
+SELECT battle
+FROM Outcomes
+JOIN Ships ON Outcomes.ship = Ships.name
+JOIN Classes ON Ships.class = Classes.class
+GROUP BY battle, Classes.country
+HAVING COUNT(*) >= 3;
+
+/* Output:
+Empty set (0.00 sec)
 */
