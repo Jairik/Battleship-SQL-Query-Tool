@@ -8,7 +8,7 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 
 <!-- Website title-->
 <head>
-    <title>Battleship Database</title>
+    <title>JJ's Battleships Database</title>
 </head>
 <body>
 
@@ -22,25 +22,28 @@ else {
 }
 ?>
 
-<!-- Dropdown menu for table in database -->
+<!-- Dropdown menu for table in database (table should be remembered on refresh -->
 <form method="POST">
     <label for="db_table">Select table:</label>
     <select id="db_table" name="db_table">
-        <option value="Classes">Classes</option>
-        <option value="Ships">Ships</option>
-        <option value="Battles">Battles</option>
-        <option value="Outcomes">Outcomes</option>
+        <option value="Classes" <?= ($_SESSION['selectedTable'] ?? '') == 'Classes' ? 'selected' : '' ?>>Classes</option>
+        <option value="Ships" <?= ($_SESSION['selectedTable'] ?? '') == 'Ships' ? 'selected' : '' ?>>Ships</option>
+        <option value="Battles" <?= ($_SESSION['selectedTable'] ?? '') == 'Battles' ? 'selected' : '' ?>>Battles</option>
+        <option value="Outcomes" <?= ($_SESSION['selectedTable'] ?? '') == 'Outcomes' ? 'selected' : '' ?>>Outcomes</option>
     </select>
+    <input type="Submit" value="Load Table">
 </form>
 
 
-<!-- Getting variables from dropdowns -->
+<!-- Getting table name from dropdown -->
 <?php
 if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
-    $_SESSION['selectedTable'] = $_POST['db_table']; // Retreiving the table
-    $sql_query = "SELECT * FROM $selectedTable";
-    /* Retreive the column names of the chosen table from the database */
-    $sql_col_query = "SHOW COLUMNS FROM" . $selectedTable;
+    $_SESSION['selectedTable'] = $_POST['db_table']; // Retrieving the table
+    $selectedTable = $_SESSION['selectedTable'];
+    $sql_query = "SELECT * FROM " . $selectedTable;
+    /* Retrieve the column names of the chosen table from the database */
+    $selectedTable = $_SESSION['selectedTable'];
+    $sql_col_query = "SHOW COLUMNS FROM " . $selectedTable;
     $result_col_query = mysqli_query($connection, $sql_col_query);
     $table_columns = [];
     if(mysqli_num_rows($result_col_query) > 0){ 
@@ -51,26 +54,16 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
     else{  // No results found from the query (should never happen)
         print '<p> Please choose a valid table from the database </p>';
     }
+    $selectedTable = $_SESSION['selectedTable'];
 }
 ?>
-
-<!-- Creating dropdown menu for action
-<form method="POST">
-    <label for="Action">Choose an action:</label>
-    <select id="Action" name="Action">
-        <option value="SELECT">Select</option>
-        <option value="INSERT">Insert</option>
-        <option value="DELETE">Delete</option>
-    </select>
-    <input type="submit" value="Choose Action">
-</form> -->
 
 <!-- Defining PHP wrapper functions -->
 <?php
 // Wrapper function to add a dropdown with a specified array of columns
 function generateDropdown($table_columns){
-    $col_dropdown = '<form method="POST">';
-    $col_dropdown .= '<label for="column_name"> WHERE: </label>';
+    //$col_dropdown = '<form method="POST">';
+    $col_dropdown = '<label for="column_name"> WHERE: </label>';
     $col_dropdown .= '<select id="column_name" name="column_name">';
     // Add each column to the dropdown
     foreach ($table_columns as $col_name ){
@@ -78,41 +71,59 @@ function generateDropdown($table_columns){
     }
     $col_dropdown .= '</select>';
     //$col_dropdown .= '<input type="submit" value="Submit Column">';
-    $col_dropdown .= '</form>';
+    //$col_dropdown .= '</form>';
     return $col_dropdown;
 }
 
-// Wrapper function to add an input field with a POST request (parameter being variable name)
-function generateInputField($inputName = 'whereClause'){
-    $input_field = '<form method="POST">';
-    $input_field .= '<input type="text" name="' . $inputName . '">';
-    $input_field .= '</form>';
+// Wrapper function to print an input field with a POST request (parameter being variable name)
+function printInputField($inputName = 'whereClause', $hint=''){
+    //$input_field = '<form method="POST">';
+    $input_field = '<input type="text" name="' . $inputName . '"  placeholder="' . $hint . '">';
+    //$input_field .= '</form>';
+    print $input_field;
 }
 
-// Wrapper function that adds a submit button 
 ?>
 
 <!-- Creating the SELECT section -->
  <h1>SELECT</h1>
  <br>
  <?php
+    /* Ensuring that the table is correctly loaded*/
+    $selectedTable = $_SESSION['selectedTable'] ?? null;
+    $table_columns = [];
+    if ($selectedTable !== null) {
+        $sql_col_query = "SHOW COLUMNS FROM " . $selectedTable;
+        $result_col_query = mysqli_query($connection, $sql_col_query);
+    
+        if ($result_col_query && mysqli_num_rows($result_col_query) > 0) {
+            while ($row = mysqli_fetch_assoc($result_col_query)) {
+                $table_columns[] = htmlspecialchars($row['Field']);
+            }
+        } else {
+            echo "<p>⚠️ Could not load columns from table: $selectedTable</p>";
+        }
+    }
+    
     /* Creating a dropdown menu for the different columns */
+    print '<form method="POST" action="">';  // Starting the form
+    // Ensure that the table properly loads in
+    print '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
     $dropdown_html = generateDropdown($table_columns);
-    if (isset($dropdown_html)){
+    if(isset($dropdown_html)){
         print $dropdown_html;  // Print the dropdown
     }
-
-    /* Generating an input box */
-    generateInputField();
-
-    /* Creating a submit button that retreives variables from the POST request */
-    print('<input type="submit" name="submit_btn" value="Submit"');
+    print '=';
+    /* Creating a submit button that retrieves variables from the POST request */
+    printInputField();
+    print '<input type="submit" name="submit_btn" value="Query">';
+    print '</form>';  // Ending the form
     if($_SERVER["REQUEST_METHOD"] == "POST"){
         $whereClause = $_POST["whereClause"];
         $selectedColumn = $_POST["column_name"];
-        // Setting the qeury variable
+        // Setting the query variable
         if(isset($selectedColumn)) {
-            $sql_query = "FROM " . $selectedTable . " SELECT " . $selectedColumn;
+            $sql_query = "SELECT " . $selectedColumn . " FROM " . $selectedTable;
             if(isset($whereClause)){
                 $sql_query .= " WHERE ". $whereClause;
             }
@@ -121,85 +132,62 @@ function generateInputField($inputName = 'whereClause'){
 
 ?>
 
-<!-- Legacy code that may be reused -->
-<?php /* 
-if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["Action"]) && isset($_SESSION['selectedTable'])) {
-    $selectedAction = $_POST['Action']; // Retreiving the action
-    $selectedTable = $_SESSION['selectedTable'];
-        if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["column_name"])) {
-            $selectedColumn[] = $_POST["column_name"];
-            // Remove the selected column so it does not show up in following dropdowns
-            $index = array_search($selectedColumn, $table_columns);
-            if($index !== false){
-                unset($table_columns[$index]); // Removes the chosen entry
-                $table_columns = array_values($table_columns);  // Reindex the array
-            }
-            $col_count = count($table_columns);  // Get the number of columns to make additional fields
-            // Add n additional more fields (for each column)
-            while($col_count > 0){
-                $dropdown_html = generateDropdown($table_columns);
-                if (isset($dropdown_html)){
-                    print $dropdown_html;
-                }
-                if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["column_name"])) {
-                    $selectedColumn[] = $_POST["column_name"];
-                    // Remove the selected column so it does not show up in following dropdowns
-                    $index = array_search($selectedColumn, $table_columns);
-                    if($index !== false){
-                        unset($table_columns[$index]); // Removes the chosen entry
-                        $table_columns = array_values($table_columns);  // Reindex the array
-                    }
-                    $col_count = $col_count - 1;  // Remove one 
-                } 
-                else {
-                    break;
-                }
-            }
-        }
-    }
-*/?>
+<!-- Creating the INSERT section -->
+ <h1>INSERT</h1>
+ <?php
 
+ ?>
+
+ <!-- Creating the DELETE section -->
+ <h1>DELETE</h1>
+ <?php
+
+ ?>
+
+ <!-- Creating the Results section -->
+<h1><strong><U>Query Results</U></strong></h1>
 <!-- Show the query results in a table-like format -->
 <?php
     // Get the query result
-    $result = mysqli_query($connection, $sql_query);
-    if(!$result){
-        print "❌ Query failed: " . mysqli_error($connection);
-    }
-    else{
-        // Begin making the table
-        $empty = false;
-        $tableOutput = "<table border='2'>";
-        $tableOutput .= "<thead>";
-        $tableOutput .= "<tr>";
-        // Add all the column names
-        while($i < count($table_columns)){
-            $tableOutput .= "<td>" . htmlspecialchars($row[$i]) . "</td>"; // Assign proper name to column
+    if(isset($sql_query)){
+        $result = mysqli_query($connection, $sql_query);
+        if(!$result){
+            print "❌ Query failed: " . mysqli_error($connection);
         }
-        $tableOutput .= "</tr>";
-        $tableOutput .= "</thead>";
-
-        // Add in the rows of the table
-        if(mysqli_num_rows($result) > 0){ 
-            // Loop through all results of the query
-            while($row = mysqli_fetch_assoc($result)){
-                $tableOutput .= "<tr>";
-                // Loop through all rows of the query
-                $i = 0;
-                while($i < count($table_columns)){
-                    $tableOutput .= "<td>" . htmlspecialchars($row[$i]) . "</td>"; // Assign proper name to column
-                }
-                $tableOutput .= "</tr>";
+        else{
+            // Begin making the table
+            $empty = false;
+            $tableOutput = "<table border='2'>";
+            $tableOutput .= "<thead>";
+            $tableOutput .= "<tr>";
+            // Add all the column names
+            foreach($table_columns as $col_name){
+                $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Assign proper name to column
             }
-        }
-        else{  // No results found from the query (should never happen)
-            print '<p> ⚠️ No results found. </p>';
-            $empty = true;
-        }
-        $tableOutput .= "</table>";
+            $tableOutput .= "</tr>";
+            $tableOutput .= "</thead>";
 
-        if($empty == false){
-            print $tableOutput;  // Print the final table
+            // Add in the rows of the table
+            if(mysqli_num_rows($result) > 0){ 
+                // Loop through all results of the query
+                while($row = mysqli_fetch_assoc($result)){
+                    $tableOutput .= "<tr>";
+                    // Loop through all rows of the query
+                    foreach($table_columns as $col_name){
+                        $tableOutput .= "<td>" . htmlspecialchars($row[$col_name]) . "</td>"; // Assign proper name to column
+                    }
+                    $tableOutput .= "</tr>";
+                }
+            }
+            else{  // No results found from the query (should never happen)
+                print '<p> ⚠️ No results found. </p>';
+                $empty = true;
+            }
+            $tableOutput .= "</table>";
+
+            if($empty == false){
+                print $tableOutput;  // Print the final table
+            }
         }
     }
 ?>
