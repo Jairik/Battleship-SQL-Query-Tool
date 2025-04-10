@@ -1,6 +1,6 @@
 <?php session_start(); ?>
 <!-- Website showcasing the search, insert, and delete functionality of the Battleship database
-Live website can be found here: https://lamp.salisbury.edu/~jmccauley4/index.php 
+Live website can be found here: https://lamp.salisbury.edu/~jmccauley4/dev.php 
 Developer Note: My inconsistent use of camel case and snake case is awful, I am immensely sorry-->
 
 <!DOCTYPE html>
@@ -83,28 +83,39 @@ function printInputField($inputName = 'whereClause', $hint=''){
     print $input_field;
 }
 
+// Converts the user input to the correct datatype (string or number)
+function formatValue($val){
+    if(is_numeric($val)){
+        return $val + 0;  // Forcing numeric conversion
+    }
+    else{
+        return "'" . addslashes((string)$val) ."'";
+    }
+}
+?>
+
+<?php
+/* Ensuring that the table is correctly loaded*/
+$selectedTable = $_SESSION['selectedTable'] ?? null;
+$table_columns = [];
+if ($selectedTable !== null) {
+    $sql_col_query = "SHOW COLUMNS FROM " . $selectedTable;
+    $result_col_query = mysqli_query($connection, $sql_col_query);
+
+    if ($result_col_query && mysqli_num_rows($result_col_query) > 0) {
+        while ($row = mysqli_fetch_assoc($result_col_query)) {
+            $table_columns[] = htmlspecialchars($row['Field']);
+        }
+    } else {
+        print "<p>⚠️ Could not load columns from table: $selectedTable</p>";
+    }
+}
 ?>
 
 <!-- Creating the SELECT section -->
  <h1>SELECT</h1>
  <br>
- <?php
-    /* Ensuring that the table is correctly loaded*/
-    $selectedTable = $_SESSION['selectedTable'] ?? null;
-    $table_columns = [];
-    if ($selectedTable !== null) {
-        $sql_col_query = "SHOW COLUMNS FROM " . $selectedTable;
-        $result_col_query = mysqli_query($connection, $sql_col_query);
-    
-        if ($result_col_query && mysqli_num_rows($result_col_query) > 0) {
-            while ($row = mysqli_fetch_assoc($result_col_query)) {
-                $table_columns[] = htmlspecialchars($row['Field']);
-            }
-        } else {
-            echo "<p>⚠️ Could not load columns from table: $selectedTable</p>";
-        }
-    }
-    
+ <?php    
     /* Creating a dropdown menu for the different columns */
     print '<form method="POST" action="">';  // Starting the form
     // Ensure that the table properly loads in
@@ -116,7 +127,7 @@ function printInputField($inputName = 'whereClause', $hint=''){
     print '=';
     /* Creating a submit button that retrieves variables from the POST request */
     printInputField();
-    print '<input type="submit" name="submit_btn" value="Query">';
+    print '<input type="submit" name="sSubmit" value="Query">';
     print '</form>';  // Ending the form
     if($_SERVER["REQUEST_METHOD"] == "POST"){
         $whereClause = $_POST["whereClause"];
@@ -124,7 +135,7 @@ function printInputField($inputName = 'whereClause', $hint=''){
         // Setting the query variable
         if(isset($selectedColumn)) {
             $sql_query = "SELECT " . $selectedColumn . " FROM " . $selectedTable;
-            if(isset($whereClause)){
+            if(isset($whereClause) && $whereClause != "") {  //If the where Clause is filled out
                 $sql_query .= " WHERE ". $whereClause;
             }
         }
@@ -135,7 +146,51 @@ function printInputField($inputName = 'whereClause', $hint=''){
 <!-- Creating the INSERT section -->
  <h1>INSERT</h1>
  <?php
+    /* Creating various columns for the different column attributes*/
+    $i = 0;  // Creating index for naming inputboxes
+    $inputName = '';
+    $inputNames[] = '';
+    $printedInputFields = '<form method="POST"';
+    $printedInputFields .= '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
+    // Looping through each column to create text (label) and input box
+    foreach($table_columns as $col_name){
+        $printedInputFields .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Print attribute name
+        $inputName = ((htmlspecialchars($col_name)) . $i);  // Generate unique name for input box
+        $printedInputFields .= '<input type="text" name="' . $inputName . '"  placeholder="' . $hint . '">';  // Print input box
+        $inputNames .= $inputName;  // Add name to list for POST retrieval later
+        $i++;  // Incremement index for future naming purposes
+        $printedInputFields .= "</br>";
+    }
+    // Creating submit button
+    $printedInputFields .= '<input type="submit" name="iSubmit" value="Query">';
+    $printedInputFields .= '</form><br>';
 
+    // Print everything and whatnot
+    print $printedInputFields;
+
+    // Pulling all the values from the POST request for the query
+    if($_SERVER["REQUEST_METHOD"] == "POST"){
+        // Check all the attribute input boxes to ensure that 
+        $isMissingFields = false;  // Flag to indicate if any fields are missing
+        $validFields = 0;
+        //NOTE: Loop through and check, changing flag if missing
+        foreach($inputNames as $name){
+            if(isset($name) && $name != '') {
+                $validFields++;
+            }
+            else{  // Field is not valid, change flag and break
+                $isMissingFields = true;
+                break;
+            }
+        }
+        // Setting the query variable
+        if(count($inputNames) == $validFields && $isMissingFields == false) {  // Somewhat redundant check
+            $sql_query = "SELECT " . $selectedColumn . " FROM " . $selectedTable;
+            if(isset($whereClause) && $whereClause != "") {  //If the where Clause is filled out
+                $sql_query .= " WHERE ". $whereClause;
+            }
+        }
+    }
  ?>
 
  <!-- Creating the DELETE section -->
