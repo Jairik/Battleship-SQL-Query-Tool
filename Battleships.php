@@ -1,3 +1,4 @@
+<?php session_start(); ?>
 <!-- Website showcasing the search, insert, and delete functionality of the Battleship database
 Live website can be found here: https://lamp.salisbury.edu/~jmccauley4/index.php -->
 
@@ -12,11 +13,11 @@ Live website can be found here: https://lamp.salisbury.edu/~jmccauley4/index.php
 
 <!-- Establishing a connection to the database -->
 <?php
-if($connection = @mysqli_connect(hostname: 'localhost', username: 'jmccauley4', password: 'jmccauley4', database: 'jmccauley4DB')){
-        print '<p>Successfully connected to MySQL.</p>';
+if($connection = @mysqli_connect('localhost', 'jmccauley4', 'jmccauley4', 'jmccauley4DB')){
+    print '<p>Successfully connected to MySQL.</p>';
 }
 else {
-        print '<p>Connection to MySQL failed.</p>';
+    print '<p>Connection to MySQL failed.</p>';
 }
 ?>
 
@@ -29,13 +30,13 @@ else {
         <option value="Battles">Battles</option>
         <option value="Outcomes">Outcomes</option>
     </select>
- </form>
+</form>
 
 
 <!-- Getting variables from dropdowns -->
 <?php
-if($_SERVER["REQUEST_METHOD"] == "POST"){
-    $selectedTable = $_POST['db_table']; // Retreiving the table
+if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
+    $_SESSION['selectedTable'] = $_POST['db_table']; // Retreiving the table
 }
 ?>
 
@@ -47,6 +48,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST"){
         <option value="INSERT">Insert</option>
         <option value="DELETE">Delete</option>
     </select>
+    <input type="submit" value="Choose Action">
 </form>
 
 <!-- Defining PHP function to print a dropdown using a given array -->
@@ -60,31 +62,34 @@ function generateDropdown($table_columns){
         $col_dropdown .= '<option value="' . htmlspecialchars($col_name) . '">' . htmlspecialchars($col_name) .'</option>';
     }
     $col_dropdown .= '</select>';
+    $col_dropdown .= '<input type="submit" value="Submit Column">';
+    $col_dropdown .= '</form>';
     return $col_dropdown;
 } 
 ?>
 
 <!-- Based on action, using PHP to update relevant fields -->
- <?php
-if($_SERVER["REQUEST_METHOD"] == "POST" && isset( $_POST["Action"]) && isset($selectedTable)) {
+<?php
+if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["Action"]) && isset($_SESSION['selectedTable'])) {
     $selectedAction = $_POST['Action']; // Retreiving the action
+    $selectedTable = $_SESSION['selectedTable'];
 
     /* Retreive the column names of the chosen table from the database */
     $sql_col_query = "SHOW COLUMNS FROM $selectedTable";
-    $result_col_query = mysqli_query( $connection, $sql_col_query);
+    $result_col_query = mysqli_query($connection, $sql_col_query);
     $table_columns = [];
-    if(mysqli_num_rows($result) > 0){ 
-        while($row = mysqli_fetch_assoc($result)){  // Looping through all results of the query
+    if(mysqli_num_rows($result_col_query) > 0){ 
+        while($row = mysqli_fetch_assoc($result_col_query)){  // Looping through all results of the query
             $table_columns[] = htmlspecialchars($row['Field']);
         }
     }
     else{  // No results found from the query (should never happen)
-        print '<p> Please choose a valid table from the database <p>';
+        print '<p> Please choose a valid table from the database </p>';
     }
 
     /* Now that the action is retreived, can use the corresponding input fields*/
     if($selectedAction == "SELECT"){
-        $dropdown_html = generateDropdown(table_columns: $table_columns);
+        $dropdown_html = generateDropdown($table_columns);
         if (isset($dropdown_html)){
             print "<h3>Column: ";
             print $dropdown_html;
@@ -92,34 +97,37 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset( $_POST["Action"]) && isset($se
         if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["column_name"])) {
             $selectedColumn[] = $_POST["column_name"];
             // Remove the selected column so it does not show up in following dropdowns
-            $index = array_search(needle: $selectedColumn, haystack: $table_columns);
+            $index = array_search($selectedColumn, $table_columns);
             if($index !== false){
                 unset($table_columns[$index]); // Removes the chosen entry
-                $table_columns = array_values(array: $table_columns);  // Reindex the array
+                $table_columns = array_values($table_columns);  // Reindex the array
             }
             $col_count = count($table_columns);  // Get the number of columns to make additional fields
             // Add n additional more fields (for each column)
             while($col_count > 0){
-                $dropdown_html = generateDropdown(table_columns: $table_columns);
+                $dropdown_html = generateDropdown($table_columns);
                 if (isset($dropdown_html)){
                     print "<h3>Column: ";
                     print $dropdown_html;
                 }
-                if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["col_name"])) {
-                    $selectedColumn .= $_POST["col_name"];
+                if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["column_name"])) {
+                    $selectedColumn[] = $_POST["column_name"];
                     // Remove the selected column so it does not show up in following dropdowns
-                    $index = array_search(needle: $selectedColumn, haystack: $table_columns);
+                    $index = array_search($selectedColumn, $table_columns);
                     if($index !== false){
                         unset($table_columns[$index]); // Removes the chosen entry
-                        $table_columns = array_values(array: $table_columns);  // Reindex the array
+                        $table_columns = array_values($table_columns);  // Reindex the array
                     }
                     $col_count = $col_count - 1;  // Remove one 
+                } 
+                else {
+                    break;
                 }
             }
         }
     }
 }
- ?>
+?>
 
 <!-- Once form is submitted, show the query results or new table -->
 <?php
