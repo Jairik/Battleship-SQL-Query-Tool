@@ -63,6 +63,10 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
     }
     $selectedTable = $_SESSION['selectedTable'];
 }
+// Setting flags to determine which queries are used
+$sQuery = false;
+$iQuery = false;
+$dQuery = false;
 ?>
 
 <!-- Defining PHP wrapper functions -->
@@ -159,14 +163,14 @@ if ($selectedTable !== null) {
         $selectFrom     = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
         // Setting the query variable
         if(isset($selectedColumn)) {
-            $sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
+            $s_sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
             if(!empty(trim($whereClause))) {  //If the where Clause is filled out
                 $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
-                $sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
+                $s_sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
             }
+            $sQuery = true;
         }
     }
-
 ?>
 
 <!-- Creating the INSERT section -->
@@ -212,17 +216,18 @@ if ($selectedTable !== null) {
         }
         // Setting the query variable
         if(count($inputNames) == $validFieldCount && $isMissingFields == false) {  // Somewhat redundant check
-            $sql_query = "INSERT INTO " . $selectedTable . " (";
+            $i_sql_query = "INSERT INTO " . $selectedTable . " (";
             // Adding all the column names to the query
             foreach($table_columns as $col_name){
-                $sql_query .= $col_name . ", ";
+                $i_sql_query .= $col_name . ", ";
             }
-            $sql_query .= ") VALUES ";
+            $i_sql_query .= ") VALUES ";
             // Adding the custom input values
             foreach($inputNames as $input){
-                $sql_query .= $input . ", ";
+                $i_sql_query .= $input . ", ";
             }
-            $sql_query .= ");";
+            $i_sql_query .= ");";
+            $iQuery = true;
         }
     }
  ?>
@@ -249,17 +254,23 @@ if ($selectedTable !== null) {
 
     // Building the query
     if($_SERVER["REQUEST_METHOD"] == "POST"){
-        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : '';
+        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : "z";
         $trimmedWhereClause = trim($whereClause);
-        $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
+        $selectedColumn = isset($_POST["deleteFrom"]) ? $_POST["deleteFrom"] : $table_columns[0];
         // Setting the query variable
-        if(isset($selectedColumn)) {
-            if(!empty(trim($whereClause))) {  //If the where Clause is filled out
-                $sql_query = "DELETE FROM " . $selectedTable;
-                $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
-                $sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
+        try{
+            if(!empty($selectedColumn) && !empty($trimmedWhereClause)) {
+                if(!empty(trim($whereClause))) {  //If the where Clause is filled out
+                    $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
+                    $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . " = " . $formattedWhereClause;  // Add to query
+                    $dQuery = true; 
+                }
             }
         }
+        catch (Exception $e){
+            print "⚠️ Invalid Delete Attempt, please fill all fields and try again";
+        }
+        
     }
  ?>
 
@@ -267,8 +278,15 @@ if ($selectedTable !== null) {
 <h1><strong><U>Query Results</U></strong></h1>
 <!-- Show the query results in a table-like format -->
 <?php
+    // Determining which query to set it to
+    if($sQuery){$sql_query = $s_sql_query; $sQuery = false;}
+    else if($iQuery){$sql_query = $i_sql_query; $iQuery = false;}
+    else if($dQuery){$sql_query = $d_sql_query; $dQuery = false;}
+    else{$sql_query = "SELECT * FROM " . $selectedTable;}  // Default
+
     // Get the query result
     if(isset($sql_query)){
+        print "SQL QUERY: " . $sql_query;
         $result = mysqli_query($connection, $sql_query);
         if($result === false){
             print "❌ Query failed: " . mysqli_error($connection);
