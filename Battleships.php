@@ -183,19 +183,25 @@ if ($selectedTable !== null) {
     /* Creating various columns for the different column attributes*/
     $i = 0;  // Creating index for naming inputboxes
     $inputName = '';
-    $inputNames[] = '';
+    $colNames = [];
     $printedInputFields = '<form method="POST">';
     $printedInputFields .= '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
+    $i_sql_query = "INSERT INTO " . $selectedTable . " (";
     // Looping through each column to create text (label) and input box
     foreach($table_columns as $col_name){
         $printedInputFields .= "<td><strong>" . htmlspecialchars($col_name) . ": </strong></td>"; // Print attribute name
         $inputName = ((htmlspecialchars($col_name)) . $i);  // Generate unique name for input box
         $hint = "";  // Expansion opportunity later
         $printedInputFields .= '<input type="text" name="' . $col_name . '"  placeholder="' . $hint . '">';  // Print input box
-        $inputNames[] = $inputName;  // Add name to list for POST retrieval later
+        $colNames = $inputName;  // Add name to list for POST retrieval later
         $i++;  // Incremement index for future naming purposes
         $printedInputFields .= "</br>";
+        $i_sql_query .= $col_name . ", ";
     }
+
+    // Formatting SQL query
+    $i_sql_query = rtrim($i_sql_query, ", ") . ") VALUES (";
+
     // Creating submit button
     $printedInputFields .= '<input type="submit" name="iSubmit" value="Insert">';
     $printedInputFields .= '</form><br>';
@@ -206,11 +212,11 @@ if ($selectedTable !== null) {
     // Pulling all the values from the POST request for the query
     if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['iSubmit'])){
         print "<br>INSERT SUBMIT PRESSED<br>";
-        // Check all the attribute input boxes to ensure that 
+        // Check all the attribute input boxes to ensure that they are correctly filled
         $isMissingFields = false;  // Flag to indicate if any fields are missing
         $validFieldCount = 0;
         //NOTE: Loop through and check, changing flag if missing
-        foreach($inputNames as $name){
+        foreach($colNames as $name){
             if(isset($name) && $name != '') {
                 print "FIELD " . $name . " IS VALID!<br>";
                 $validFieldCount++;
@@ -221,23 +227,15 @@ if ($selectedTable !== null) {
                 break;
             }
         }
-        // Setting the query variable
-        if(count($inputNames) == $validFieldCount && $isMissingFields == false) {  // Somewhat redundant check
-            print "Starting to build INSERT QUERY<br>";
-            $i_sql_query = "INSERT INTO " . $selectedTable . " (";
-            // Adding all the column names to the query
-            foreach($table_columns as $col_name){
-                $i_sql_query .= $col_name . ", ";
-            }
-            $i_sql_query .= ") VALUES ";
-            // Adding the custom input values
-            foreach($inputNames as $input){
-                $i_sql_query .= $input . ", ";
-            }
-            $i_sql_query .= ");";
-            $iQuery = true;
-            print "<br>INSERT QUERY: " . $i_sql_query;
+        // Adding the custom input values
+        $insertValues = [];
+        // Getting the inputs from all the insert boxes
+        foreach($table_columns as $col_name){
+            $insertValues[] = isset($_POST[$col_name]) ? formatValue($_POST[$col_name]) : "NULL";
         }
+        $i_sql_query .= implode(", ", $insertValues) . ");"; // Adding the inputs and finishing query 
+        $iQuery = true;
+        print "<br>INSERT QUERY: " . $i_sql_query;
     }
  ?>
 
@@ -263,16 +261,14 @@ if ($selectedTable !== null) {
 
     // Building the query
     if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['dSubmit'])){
-        $deleteWhereClause = isset($_POST["deleteWhereClause"]) ? formatValue($_POST["deleteWhereClause"]) : "z";
-        $trimmedDeleteWhereClause = trim($deleteWhereClause);
+        $deleteWhereClause = isset($_POST["deleteWhereClause"]) ? formatValue($_POST["deleteWhereClause"]) : "NULL";
         $selectedColumn = isset($_POST["deleteFrom"]) ? $_POST["deleteFrom"] : $table_columns[0];
         // Setting the query variable
         try{
-            if(!empty($selectedColumn) && !empty($trimmedDeleteWhereClause)) {
+            if(!empty(trim($selectedColumn))) {
                 if(!empty(trim($deleteWhereClause))) {  //If the where Clause is filled out
-                    $formattedDeleteWhereClause = formatValue($trimmedDeleteWhereClause);  // Format
                     $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . 
-                    " = " . $formattedDeleteWhereClause;  // Add to query
+                    " = " . $deleteWhereClause;  // Add to query
                     $dQuery = true; 
                 }
             }
@@ -289,10 +285,11 @@ if ($selectedTable !== null) {
 <!-- Show the query results in a table-like format -->
 <?php
     // Determining which query to set it to
-    if($sQuery){$sql_query = $s_sql_query; $sQuery = false;}
-    else if($iQuery){$sql_query = $i_sql_query; $iQuery = false;}
-    else if($dQuery){$sql_query = $d_sql_query; $dQuery = false;}
-    else{$sql_query = "SELECT * FROM " . $selectedTable;}  // Default
+    $defaultQuerySelected = false;
+    if($sQuery){$sql_query = $s_sql_query;}
+    else if($iQuery){$sql_query = $i_sql_query;}
+    else if($dQuery){$sql_query = $d_sql_query;}
+    else{$sql_query = "SELECT * FROM " . $selectedTable; $defaultQuerySelected = true;}  // Default
 
     // Get and output the query result
     if(isset($sql_query)){
@@ -308,7 +305,7 @@ if ($selectedTable !== null) {
         if($result === false){
             print "❌ Query failed: " . mysqli_error($connection);
         }
-        else{
+        else{  // NOTE: MUST MODIFY FOR ONE COLUMN SELECT
             // Begin making the table
             $empty = false;
             $tableOutput = "<table border='2'>";
@@ -322,28 +319,72 @@ if ($selectedTable !== null) {
             $tableOutput .= "</thead>";
 
             // Add in the rows of the table
-            if(mysqli_num_rows($result) > 0){ 
-                // Loop through all results of the query
-                while($row = mysqli_fetch_assoc($result)){
-                    $tableOutput .= "<tr>";
-                    // Loop through all rows of the query
-                    foreach($table_columns as $col_name){
-                        $tableOutput .= "<td>" . htmlspecialchars($row[$col_name]) . "</td>"; // Assign proper name to column
+            if($sQuery || $defaultQuerySelected){ //If using a SELECT statement
+                try{
+                    if(mysqli_num_rows($result) > 0){ 
+                        // Loop through all results of the query
+                        while($row = mysqli_fetch_assoc($result)){
+                            $tableOutput .= "<tr>";
+                            // Loop through all rows of the query
+                            foreach($table_columns as $col_name){
+                                $tableOutput .= "<td>" . htmlspecialchars($row[$col_name]) . "</td>"; // Assign proper name to column
+                            }
+                            $tableOutput .= "</tr>";
+                        }
                     }
-                    $tableOutput .= "</tr>";
+                    else{
+                        print '<p> ⚠️ No results found. </p>';
+                        $empty = true;
+        
+                    }
+                    $tableOutput .= "</table>";
+        
+                    if($empty == false){
+                        print $tableOutput;  // Print the final table
+                    }
+                }
+                catch(Exception $e){
+                    "❌ Query failed: " . $e;
                 }
             }
-            else{
-                print '<p> ⚠️ No results found. </p>';
-                $empty = true;
-
-            }
-            $tableOutput .= "</table>";
-
-            if($empty == false){
-                print $tableOutput;  // Print the final table
+            else {  // Otherwise, using an INSERT or DELETE Statement
+                try{
+                    $affectedRows = mysqli_affected_rows($connection);
+                    if($affectedRows > 0){
+                        // Displaying appropriate message based on query
+                        if($dQuery) {print "<p>Deleted $affectedRows rows.</p>";}
+                        else{print "<p>Inserted $affectedRows rows.</p>";}
+                    } else {
+                        print "<p>No rows were deleted.</p>";
+                    }
+                    // Running a new SELECT * query to display the updated table
+                    $newResult = mysqli_query($connection, "SELECT * FROM " . $selectedTable);
+                    if($newResult && mysqli_num_rows($newResult) > 0){ 
+                        $tableOutput = "<table border='2'>";
+                        $tableOutput .= "<thead><tr>";
+                        foreach($table_columns as $col_name){
+                            $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>";
+                        }
+                        $tableOutput .= "</tr></thead>";
+                        while($row = mysqli_fetch_assoc($newResult)){
+                            $tableOutput .= "<tr>";
+                            foreach($table_columns as $col_name){
+                                $tableOutput .= "<td>" . htmlspecialchars($row[$col_name]) . "</td>";
+                            }
+                            $tableOutput .= "</tr>";
+                        }
+                        $tableOutput .= "</table>";
+                        print $tableOutput;
+                    } else {
+                        print "<p>No rows available in table.</p>";
+                    }
+                }    
+                catch(Exception $e){
+                    "❌ Query failed: " . $e;
+                }
             }
         }
+        $sQuery = $iQuery = $dQuery = false;  // Setting all query types to false for next user entry
     }
 ?>
 
