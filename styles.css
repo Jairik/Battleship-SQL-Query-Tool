@@ -1,0 +1,89 @@
+/* Custom css for the battleship database website */
+
+/* Defining a rule for fade-ins */
+@keyframes fadeIn {
+    0% {
+        opacity: 0; /* Start with 0 opacity (invisible) */
+    }
+    100% {
+        opacity: 1; /* End with full opacity (visible) */
+    }
+}
+
+/* Overall formatting for the entire document */
+body {
+    background-color: bisque;
+    font-family: 'Asap', sans-serif;
+    /* Centering entire document */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+/* Creating a wrapper for adding animation */
+.wrapper{
+    animation: fadeIn 1s ease-in-out;
+}
+
+/* Creating centering rules for table */
+.tableCenter{
+    animation: fadeIn 1.05s ease-in-out;
+    text-align: center;
+    display: inline-block;
+}
+
+/* Custom footer formatting */
+.footer{
+    color:rgb(80, 0, 0);
+    background-color: rgb(204, 204, 204);
+    font-family: 'Asap', sans-serif;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Adding custom header formatting */
+h1{
+    color:rgb(80, 0, 0);
+    text-decoration: solid;
+}
+
+/* Creating a border around different fields for differentiation */
+.border-section{
+    border: 2px solid rgb(80, 0, 0);
+    padding: 5px;
+    margin: 0;
+    box-sizing: border-box;
+    border-radius: 2px;
+    width: 100%;
+    text-align: center;
+    display: inline-block;
+}
+
+/* Animation for glowing effect */
+@keyframes glow-animation {
+    0% {
+        text-shadow: 0 0 5px white;
+    }
+    50% {
+        text-shadow: 3px 3px 5px white;
+    }
+    100% {
+        text-shadow: 0 0 5px white;
+    }
+}
+
+
+/* Creating custom rules for the website title */
+.TitleText{
+    animation: fadeIn .2s ease-in-out, glow-animation 3s infinite alternate;
+    color:rgb(80, 0, 0);
+    text-decoration: solid;
+    font-size:3em;
+}
+
+/* */
+.websiteDescription{
+    animation: fadeIn .3s ease-in-out;
+}

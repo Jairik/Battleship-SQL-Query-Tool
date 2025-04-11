@@ -8,16 +8,20 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 
 <!-- Developer debugging - Displays any errors on screen -->
 <?php
- error_reporting(E_ALL);
- ini_set('display_errors', 1);
+ //error_reporting(E_ALL);
+ //ini_set('display_errors', 1);
  //session_start();
- ?>
+ ?> 
 
 <!-- Website title-->
 <head>
     <title>JJ's Query Tool</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Linking styles.css file -->
+    <!-- Linking custom font (Asap) -->
+    <link href="https://fonts.googleapis.com/css2?family=Asap:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+<div class="wrapper">
 
 <!-- Establishing a connection to the database -->
 <?php
@@ -30,9 +34,20 @@ else {
 }
 ?>
 
+<!-- Creating title and short description at top of the webpage -->
+<div class="border-section">
+ <h1 class="TitleText">JJ's Battleship Query Tool</h1>
+ <p class="websiteDescription">
+ Welcome to JJ's Query Tool for the battleship database! To get started, select a table from 
+ the database to load it, then feel free to modify or select as you wish! Thank you!
+ </p>
+</div>
+
 <!-- Dropdown menu for table in database (table should be remembered on refresh -->
+<div class="border-section">
+<h1 class=tableSelection>Select Table:</h1>
 <form method="POST">
-    <label for="db_table">Select table:</label>
+    <label for="db_table"></label>
     <select id="db_table" name="db_table">
         <option value="Classes" <?= ($_SESSION['selectedTable'] ?? '') == 'Classes' ? 'selected' : '' ?>>Classes</option>
         <option value="Ships" <?= ($_SESSION['selectedTable'] ?? '') == 'Ships' ? 'selected' : '' ?>>Ships</option>
@@ -41,6 +56,7 @@ else {
     </select>
     <input type="Submit" value="Load Table">
 </form>
+</div>
 
 
 <!-- Getting table name from dropdown -->
@@ -130,6 +146,7 @@ if ($selectedTable !== null) {
 ?>
 
 <!-- Creating the SELECT section -->
+<div class="border-section">
  <h1>SELECT</h1>
  <?php    
     /* Creating a dropdown menu for the different columns */
@@ -161,7 +178,6 @@ if ($selectedTable !== null) {
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['sSubmit'])) {
         // Get the raw value from the whereClause field
         $rawselectWhereClause = $_POST["selectWhereClause"] ?? '';
-        print "<br>Raw Where Clause: " . $rawselectWhereClause;
         // Get the other selected columns from the dropdowns
         $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
         $selectFrom = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
@@ -174,12 +190,12 @@ if ($selectedTable !== null) {
             $s_sql_query .= " WHERE " . $selectedColumn . " = " . $formattedselectWhereClause;
         }
         $sQuery = true;
-        print "<br>SELECT QUERY: " . $s_sql_query;
     }
-    
 ?>
+</div>
 
 <!-- Creating the INSERT section -->
+<div class="border-section">
  <h1>INSERT</h1>
  <?php
     /* Creating various columns for the different column attributes*/
@@ -213,18 +229,15 @@ if ($selectedTable !== null) {
 
     // Pulling all the values from the POST request for the query
     if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['iSubmit'])){
-        print "<br>INSERT SUBMIT PRESSED<br>";
         // Check all the attribute input boxes to ensure that they are correctly filled
         $isMissingFields = false;  // Flag to indicate if any fields are missing
         $validFieldCount = 0;
         //NOTE: Loop through and check, changing flag if missing
         foreach($colNames as $name){
             if(isset($name) && $name != '') {
-                print "FIELD " . $name . " IS VALID!<br>";
                 $validFieldCount++;
             }
             else{  // Field is not valid, change flag and break
-                print "FIELD" . $name . " IS MISSING!!!!!!<br>";
                 $isMissingFields = true;
                 break;
             }
@@ -237,16 +250,17 @@ if ($selectedTable !== null) {
         }
         $i_sql_query .= implode(", ", $insertValues) . ");"; // Adding the inputs and finishing query 
         $iQuery = true;
-        print "<br>INSERT QUERY: " . $i_sql_query;
     }
  ?>
+</div>
 
  <!-- Creating the DELETE section -->
+<div class="border-section">
  <h1>DELETE</h1>
 
  <?php
     // Creating dropdown with columns to delete from
-    $col_dropdown = 'Where: <form method="POST"> <label for="deleteFrom">';
+    $col_dropdown = '<strong>Where:</strong> <form method="POST"> <label for="deleteFrom">';
     $col_dropdown .= '<select id="deleteFrom" name="deleteFrom">';
     // Add each column to the dropdown
     foreach ($table_columns as $col_name){
@@ -269,8 +283,7 @@ if ($selectedTable !== null) {
         try{
             if(!empty(trim($selectedColumn))) {
                 if(!empty(trim($deleteWhereClause))) {  //If the where Clause is filled out
-                    $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . 
-                    " = " . $deleteWhereClause;  // Add to query
+                    $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . " = " . $deleteWhereClause;  // Add to query
                     $dQuery = true; 
                 }
             }
@@ -281,9 +294,11 @@ if ($selectedTable !== null) {
         
     }
  ?>
+ </div>
 
  <!-- Creating the Results section -->
-<h1><strong><U>Query Results</U></strong></h1>
+<div class="border-section">
+<h1><strong>Query Results</strong></h1>
 <!-- Show the query results in a table-like format -->
 <?php
     // Determining which query to set it to
@@ -293,9 +308,12 @@ if ($selectedTable !== null) {
     else if($dQuery){$sql_query = $d_sql_query;}
     else{$sql_query = "SELECT * FROM " . $selectedTable; $defaultQuerySelected = true;}  // Default
 
+    // Printing table name on top
+    print "<h3>$selectedTable</h3>";
+
     // Get and output the query result
     if(isset($sql_query)){
-        print "SQL QUERY: " . $sql_query;
+        //print "SQL QUERY: " . $sql_query;
         // Retreiving the query result
         try{
             $result = mysqli_query($connection, $sql_query);
@@ -309,8 +327,9 @@ if ($selectedTable !== null) {
         }
         else{
             // Begin making the table
+            $tableOutput = "<div class=tableCenter>";
             $empty = false;
-            $tableOutput = "<table border='2'>";
+            $tableOutput .= "<table border='2'>";
             $tableOutput .= "<thead>";
             $tableOutput .= "<tr>";
 
@@ -392,15 +411,17 @@ if ($selectedTable !== null) {
                 catch(Exception $e){
                     "❌ Query failed: " . $e;
                 }
+                print "</div>";
             }
         }
         $sQuery = $iQuery = $dQuery = false;  // Setting all query types to false for next user entry
     }
 ?>
-
+</div>
 <br>  <!-- Formatting break -->
 
 <p class=footer> Thank you for using JJ's Battleship Database Query Tool! </p>
 
+</div>
 </body>
 </html>
