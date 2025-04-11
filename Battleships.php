@@ -15,7 +15,7 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 
 <!-- Website title-->
 <head>
-    <title>JJ's Battleships Database</title>
+    <title>JJ's Query Tool</title>
 </head>
 <body>
 
@@ -23,7 +23,7 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 <?php
 if($connection = @mysqli_connect('localhost', 'jmccauley4', 'jmccauley4', 'jmccauley4DB')){
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);  // Enabling exception reporting
-    print '<p>Successfully connected to MySQL.</p>';
+    //print '<p>Successfully connected to MySQL.</p>';
 }
 else {
     print '<p>Connection to MySQL failed.</p>';
@@ -73,13 +73,13 @@ $dQuery = false;
 <!-- Defining PHP wrapper functions -->
 <?php
 // Wrapper function to add a dropdown with a specified array of columns
-function generateDropdown($table_columns, $hasSecondaryArg = false, $secondaryArg = '', $doWhere = false){
+function generateDropdown($table_columns, $hasSecondaryArg = false, $secondaryArg = '', $doWhere = false, $name = 'column_name'){
     //$col_dropdown = '<form method="POST">';
-    $col_dropdown = '<label for="column_name">';
+    $col_dropdown = '<label for="' . $name . '">';
     if($doWhere){
         $col_dropdown .= ' WHERE: </label>';
     } 
-    $col_dropdown .= '<select id="column_name" name="column_name">';
+    $col_dropdown .= '<select id="' . $name . '" name="' . $name . '">';
     // Add each column to the dropdown
     foreach ($table_columns as $col_name ){
         $col_dropdown .= '<option value="' . htmlspecialchars($col_name) . '">' . htmlspecialchars($col_name) .'</option>';
@@ -91,7 +91,7 @@ function generateDropdown($table_columns, $hasSecondaryArg = false, $secondaryAr
 }
 
 // Wrapper function to print an input field with a POST request (parameter being variable name)
-function printInputField($inputName = 'whereClause'){
+function printInputField($inputName = 'selectWhereClause'){
     //$input_field = '<form method="POST">';
     $input_field = '<input type="text" name="' . $inputName . '">';
     //$input_field .= '</form>';
@@ -156,20 +156,20 @@ if ($selectedTable !== null) {
     printInputField();
     print '<input type="submit" name="sSubmit" value="Query">';
     print '</form>';  // Ending the form
-    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['sSubmit'])) {
         // Get the raw value from the whereClause field
-        $rawWhereClause = $_POST["whereClause"] ?? '';
-        print "<br>Raw Where Clause: " . $rawWhereClause;
+        $rawselectWhereClause = $_POST["selectWhereClause"] ?? '';
+        print "<br>Raw Where Clause: " . $rawselectWhereClause;
         // Get the other selected columns from the dropdowns
         $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
         $selectFrom     = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
         // Begin building the SELECT statement
         $s_sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
         // Only process the where clause if the raw input is non-empty after trimming
-        if (!empty(trim($rawWhereClause))) {
+        if (!empty(trim($rawselectWhereClause))) {
             // Formatting the trimmed value
-            $formattedWhereClause = formatValue(trim($rawWhereClause));
-            $s_sql_query .= " WHERE " . $selectedColumn . " = " . $formattedWhereClause;
+            $formattedselectWhereClause = formatValue(trim($rawselectWhereClause));
+            $s_sql_query .= " WHERE " . $selectedColumn . " = " . $formattedselectWhereClause;
         }
         $sQuery = true;
         print "<br>SELECT QUERY: " . $s_sql_query;
@@ -204,7 +204,7 @@ if ($selectedTable !== null) {
     print $printedInputFields;
 
     // Pulling all the values from the POST request for the query
-    if($_SERVER["REQUEST_METHOD"] == "POST"){
+    if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['iSubmit'])){
         print "<br>INSERT SUBMIT PRESSED<br>";
         // Check all the attribute input boxes to ensure that 
         $isMissingFields = false;  // Flag to indicate if any fields are missing
@@ -246,7 +246,7 @@ if ($selectedTable !== null) {
 
  <?php
     // Creating dropdown with columns to delete from
-    $col_dropdown = 'Where: <label for="deleteFrom">';
+    $col_dropdown = 'Where: <form method="POST"> <label for="deleteFrom">';
     $col_dropdown .= '<select id="deleteFrom" name="deleteFrom">';
     // Add each column to the dropdown
     foreach ($table_columns as $col_name){
@@ -257,21 +257,22 @@ if ($selectedTable !== null) {
 
     // Adding input field for user to select value to delete
     print " = ";  // Formatting
-    printInputField();
+    printInputField("deleteWhereClause");
     print '<input type="submit" name="dSubmit" value="Delete">';
     print '</form>';  // Ending the form
 
     // Building the query
-    if($_SERVER["REQUEST_METHOD"] == "POST"){
-        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : "z";
-        $trimmedWhereClause = trim($whereClause);
+    if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['dSubmit'])){
+        $deleteWhereClause = isset($_POST["deleteWhereClause"]) ? formatValue($_POST["deleteWhereClause"]) : "z";
+        $trimmedDeleteWhereClause = trim($deleteWhereClause);
         $selectedColumn = isset($_POST["deleteFrom"]) ? $_POST["deleteFrom"] : $table_columns[0];
         // Setting the query variable
         try{
-            if(!empty($selectedColumn) && !empty($trimmedWhereClause)) {
-                if(!empty(trim($whereClause))) {  //If the where Clause is filled out
-                    $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
-                    $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . " = " . $formattedWhereClause;  // Add to query
+            if(!empty($selectedColumn) && !empty($trimmedDeleteWhereClause)) {
+                if(!empty(trim($deleteWhereClause))) {  //If the where Clause is filled out
+                    $formattedDeleteWhereClause = formatValue($trimmedDeleteWhereClause);  // Format
+                    $d_sql_query = "DELETE FROM " . $selectedTable . " WHERE ". $selectedColumn . 
+                    " = " . $formattedDeleteWhereClause;  // Add to query
                     $dQuery = true; 
                 }
             }
@@ -345,6 +346,10 @@ if ($selectedTable !== null) {
         }
     }
 ?>
+
+<br>  <!-- Formatting break -->
+
+<p class=footer> Thank you for using JJ's Battleship Database Query Tool! </p>
 
 </body>
 </html>
