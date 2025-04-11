@@ -22,6 +22,7 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 <!-- Establishing a connection to the database -->
 <?php
 if($connection = @mysqli_connect('localhost', 'jmccauley4', 'jmccauley4', 'jmccauley4DB')){
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);  // Enabling exception reporting
     print '<p>Successfully connected to MySQL.</p>';
 }
 else {
@@ -128,7 +129,6 @@ if ($selectedTable !== null) {
 
 <!-- Creating the SELECT section -->
  <h1>SELECT</h1>
- <br>
  <?php    
     /* Creating a dropdown menu for the different columns */
     print '<form method="POST" action="">';  // Starting the form
@@ -156,21 +156,25 @@ if ($selectedTable !== null) {
     printInputField();
     print '<input type="submit" name="sSubmit" value="Query">';
     print '</form>';  // Ending the form
-    if($_SERVER["REQUEST_METHOD"] == "POST"){
-        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : '';
-        $trimmedWhereClause = trim($whereClause);
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        // Get the raw value from the whereClause field
+        $rawWhereClause = $_POST["whereClause"] ?? '';
+        print "<br>Raw Where Clause: " . $rawWhereClause;
+        // Get the other selected columns from the dropdowns
         $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
         $selectFrom     = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
-        // Setting the query variable
-        if(isset($selectedColumn)) {
-            $s_sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
-            if(!empty(trim($whereClause))) {  //If the where Clause is filled out
-                $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
-                $s_sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
-            }
-            $sQuery = true;
+        // Begin building the SELECT statement
+        $s_sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
+        // Only process the where clause if the raw input is non-empty after trimming
+        if (!empty(trim($rawWhereClause))) {
+            // Formatting the trimmed value
+            $formattedWhereClause = formatValue(trim($rawWhereClause));
+            $s_sql_query .= " WHERE " . $selectedColumn . " = " . $formattedWhereClause;
         }
+        $sQuery = true;
+        print "<br>SELECT QUERY: " . $s_sql_query;
     }
+    
 ?>
 
 <!-- Creating the INSERT section -->
@@ -201,21 +205,25 @@ if ($selectedTable !== null) {
 
     // Pulling all the values from the POST request for the query
     if($_SERVER["REQUEST_METHOD"] == "POST"){
+        print "<br>INSERT SUBMIT PRESSED<br>";
         // Check all the attribute input boxes to ensure that 
         $isMissingFields = false;  // Flag to indicate if any fields are missing
         $validFieldCount = 0;
         //NOTE: Loop through and check, changing flag if missing
         foreach($inputNames as $name){
             if(isset($name) && $name != '') {
+                print "FIELD " . $name . " IS VALID!<br>";
                 $validFieldCount++;
             }
             else{  // Field is not valid, change flag and break
+                print "FIELD" . $name . " IS MISSING!!!!!!<br>";
                 $isMissingFields = true;
                 break;
             }
         }
         // Setting the query variable
         if(count($inputNames) == $validFieldCount && $isMissingFields == false) {  // Somewhat redundant check
+            print "Starting to build INSERT QUERY<br>";
             $i_sql_query = "INSERT INTO " . $selectedTable . " (";
             // Adding all the column names to the query
             foreach($table_columns as $col_name){
@@ -228,6 +236,7 @@ if ($selectedTable !== null) {
             }
             $i_sql_query .= ");";
             $iQuery = true;
+            print "<br>INSERT QUERY: " . $i_sql_query;
         }
     }
  ?>
@@ -240,7 +249,7 @@ if ($selectedTable !== null) {
     $col_dropdown = 'Where: <label for="deleteFrom">';
     $col_dropdown .= '<select id="deleteFrom" name="deleteFrom">';
     // Add each column to the dropdown
-    foreach ($table_columns as $col_name ){
+    foreach ($table_columns as $col_name){
         $col_dropdown .= '<option value="' . htmlspecialchars($col_name) . '">' . htmlspecialchars($col_name) .'</option>';
     }
     $col_dropdown .= '</select>';
@@ -284,10 +293,17 @@ if ($selectedTable !== null) {
     else if($dQuery){$sql_query = $d_sql_query; $dQuery = false;}
     else{$sql_query = "SELECT * FROM " . $selectedTable;}  // Default
 
-    // Get the query result
+    // Get and output the query result
     if(isset($sql_query)){
         print "SQL QUERY: " . $sql_query;
-        $result = mysqli_query($connection, $sql_query);
+        // Retreiving the query result
+        try{
+            $result = mysqli_query($connection, $sql_query);
+        }
+        catch(Exception $e){
+            print "❌ SQL ERROR: " . mysqli_error($connection);
+        }
+        
         if($result === false){
             print "❌ Query failed: " . mysqli_error($connection);
         }
