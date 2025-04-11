@@ -68,6 +68,8 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
 $sQuery = false;
 $iQuery = false;
 $dQuery = false;
+// Variable used throughout the script
+$selectFrom = "*";  // Default to *
 ?>
 
 <!-- Defining PHP wrapper functions -->
@@ -162,7 +164,7 @@ if ($selectedTable !== null) {
         print "<br>Raw Where Clause: " . $rawselectWhereClause;
         // Get the other selected columns from the dropdowns
         $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
-        $selectFrom     = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
+        $selectFrom = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
         // Begin building the SELECT statement
         $s_sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
         // Only process the where clause if the raw input is non-empty after trimming
@@ -305,28 +307,30 @@ if ($selectedTable !== null) {
         if($result === false){
             print "❌ Query failed: " . mysqli_error($connection);
         }
-        else{  // NOTE: MUST MODIFY FOR ONE COLUMN SELECT
+        else{
             // Begin making the table
             $empty = false;
             $tableOutput = "<table border='2'>";
             $tableOutput .= "<thead>";
             $tableOutput .= "<tr>";
-            // Add all the column names
-            foreach($table_columns as $col_name){  //NOTE: THIS IS WHAT I MUST MODIFY FOR SELECT
-                $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Assign proper name to column
-            }
-            $tableOutput .= "</tr>";
-            $tableOutput .= "</thead>";
 
             // Add in the rows of the table
             if($sQuery || $defaultQuerySelected){ //If using a SELECT statement
                 try{
                     if(mysqli_num_rows($result) > 0){ 
+                        // Add the used columns into the header
+                        // Determine which rows to display
+                        $displayColumns = ($selectFrom === "*") ? $table_columns : [$selectFrom];
+                        foreach($displayColumns as $col_name){  //NOTE: THIS IS WHAT I MUST MODIFY FOR SELECT
+                            $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Assign proper name to column
+                        }
+                        $tableOutput .= "</tr>";
+                        $tableOutput .= "</thead>";
                         // Loop through all results of the query
                         while($row = mysqli_fetch_assoc($result)){
                             $tableOutput .= "<tr>";
                             // Loop through all rows of the query
-                            foreach($table_columns as $col_name){
+                            foreach($displayColumns as $col_name){
                                 $tableOutput .= "<td>" . htmlspecialchars($row[$col_name]) . "</td>"; // Assign proper name to column
                             }
                             $tableOutput .= "</tr>";
@@ -349,6 +353,12 @@ if ($selectedTable !== null) {
             }
             else {  // Otherwise, using an INSERT or DELETE Statement
                 try{
+                    // Add all the column names
+                    foreach($table_columns as $col_name){
+                        $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Assign proper name to column
+                    }
+                    $tableOutput .= "</tr>";
+                    $tableOutput .= "</thead>";
                     $affectedRows = mysqli_affected_rows($connection);
                     if($affectedRows > 0){
                         // Displaying appropriate message based on query
