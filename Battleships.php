@@ -6,6 +6,13 @@ Developer Note: My inconsistent use of camel case and snake case is awful, I am 
 <!DOCTYPE html>
 <html lang="en">
 
+<!-- Developer debugging - Displays any errors on screen -->
+<?php
+ error_reporting(E_ALL);
+ ini_set('display_errors', 1);
+ //session_start();
+ ?>
+
 <!-- Website title-->
 <head>
     <title>JJ's Battleships Database</title>
@@ -61,9 +68,12 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['db_table'])){
 <!-- Defining PHP wrapper functions -->
 <?php
 // Wrapper function to add a dropdown with a specified array of columns
-function generateDropdown($table_columns){
+function generateDropdown($table_columns, $hasSecondaryArg = false, $secondaryArg = '', $doWhere = false){
     //$col_dropdown = '<form method="POST">';
-    $col_dropdown = '<label for="column_name"> WHERE: </label>';
+    $col_dropdown = '<label for="column_name">';
+    if($doWhere){
+        $col_dropdown .= ' WHERE: </label>';
+    } 
     $col_dropdown .= '<select id="column_name" name="column_name">';
     // Add each column to the dropdown
     foreach ($table_columns as $col_name ){
@@ -76,9 +86,9 @@ function generateDropdown($table_columns){
 }
 
 // Wrapper function to print an input field with a POST request (parameter being variable name)
-function printInputField($inputName = 'whereClause', $hint=''){
+function printInputField($inputName = 'whereClause'){
     //$input_field = '<form method="POST">';
-    $input_field = '<input type="text" name="' . $inputName . '"  placeholder="' . $hint . '">';
+    $input_field = '<input type="text" name="' . $inputName . '">';
     //$input_field .= '</form>';
     print $input_field;
 }
@@ -120,7 +130,20 @@ if ($selectedTable !== null) {
     print '<form method="POST" action="">';  // Starting the form
     // Ensure that the table properly loads in
     print '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
-    $dropdown_html = generateDropdown($table_columns);
+    // Creating the first dropdown
+    $col_dropdown = '<label for="selectFrom">';
+    $col_dropdown .= '<select id="selectFrom" name="selectFrom">';
+    // Adding a option to select all columns
+    $col_dropdown .= '<option value="*">ALL</option>';
+    // Add each column to the dropdown
+    foreach ($table_columns as $col_name ){
+        $col_dropdown .= '<option value="' . htmlspecialchars($col_name) . '">' . htmlspecialchars($col_name) .'</option>';
+    }
+    $col_dropdown .= '</select>';
+    print $col_dropdown;  // Print the newly created dropdown
+    print "<br>";  // Skip to next line for formatting
+    // Creating the second dropdown using templates
+    $dropdown_html = generateDropdown($table_columns, doWhere: true);
     if(isset($dropdown_html)){
         print $dropdown_html;  // Print the dropdown
     }
@@ -130,13 +153,16 @@ if ($selectedTable !== null) {
     print '<input type="submit" name="sSubmit" value="Query">';
     print '</form>';  // Ending the form
     if($_SERVER["REQUEST_METHOD"] == "POST"){
-        $whereClause = $_POST["whereClause"];
-        $selectedColumn = $_POST["column_name"];
+        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : '';
+        $trimmedWhereClause = trim($whereClause);
+        $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
+        $selectFrom     = isset($_POST["selectFrom"]) ? $_POST["selectFrom"] : '*';
         // Setting the query variable
         if(isset($selectedColumn)) {
-            $sql_query = "SELECT " . $selectedColumn . " FROM " . $selectedTable;
-            if(isset($whereClause) && $whereClause != "") {  //If the where Clause is filled out
-                $sql_query .= " WHERE ". $whereClause;
+            $sql_query = "SELECT " . $selectFrom . " FROM " . $selectedTable;
+            if(!empty(trim($whereClause))) {  //If the where Clause is filled out
+                $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
+                $sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
             }
         }
     }
@@ -150,19 +176,20 @@ if ($selectedTable !== null) {
     $i = 0;  // Creating index for naming inputboxes
     $inputName = '';
     $inputNames[] = '';
-    $printedInputFields = '<form method="POST"';
+    $printedInputFields = '<form method="POST">';
     $printedInputFields .= '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
     // Looping through each column to create text (label) and input box
     foreach($table_columns as $col_name){
         $printedInputFields .= "<td><strong>" . htmlspecialchars($col_name) . ": </strong></td>"; // Print attribute name
         $inputName = ((htmlspecialchars($col_name)) . $i);  // Generate unique name for input box
-        $printedInputFields .= '<input type="text" name="' . $inputName . '"  placeholder="' . $hint . '">';  // Print input box
-        $inputNames .= $inputName;  // Add name to list for POST retrieval later
+        $hint = "";  // Expansion opportunity later
+        $printedInputFields .= '<input type="text" name="' . $col_name . '"  placeholder="' . $hint . '">';  // Print input box
+        $inputNames[] = $inputName;  // Add name to list for POST retrieval later
         $i++;  // Incremement index for future naming purposes
         $printedInputFields .= "</br>";
     }
     // Creating submit button
-    $printedInputFields .= '<input type="submit" name="iSubmit" value="Query">';
+    $printedInputFields .= '<input type="submit" name="iSubmit" value="Insert">';
     $printedInputFields .= '</form><br>';
 
     // Print everything and whatnot
@@ -184,7 +211,7 @@ if ($selectedTable !== null) {
             }
         }
         // Setting the query variable
-        if(count($inputNames) == $validFields && $isMissingFields == false) {  // Somewhat redundant check
+        if(count($inputNames) == $validFieldCount && $isMissingFields == false) {  // Somewhat redundant check
             $sql_query = "INSERT INTO " . $selectedTable . " (";
             // Adding all the column names to the query
             foreach($table_columns as $col_name){
@@ -204,7 +231,36 @@ if ($selectedTable !== null) {
  <h1>DELETE</h1>
 
  <?php
-    print "DELETE"
+    // Creating dropdown with columns to delete from
+    $col_dropdown = 'Where: <label for="deleteFrom">';
+    $col_dropdown .= '<select id="deleteFrom" name="deleteFrom">';
+    // Add each column to the dropdown
+    foreach ($table_columns as $col_name ){
+        $col_dropdown .= '<option value="' . htmlspecialchars($col_name) . '">' . htmlspecialchars($col_name) .'</option>';
+    }
+    $col_dropdown .= '</select>';
+    print $col_dropdown;  // Print the newly created dropdown
+
+    // Adding input field for user to select value to delete
+    print " = ";  // Formatting
+    printInputField();
+    print '<input type="submit" name="dSubmit" value="Delete">';
+    print '</form>';  // Ending the form
+
+    // Building the query
+    if($_SERVER["REQUEST_METHOD"] == "POST"){
+        $whereClause = isset($_POST["whereClause"]) ? formatValue($_POST["whereClause"]) : '';
+        $trimmedWhereClause = trim($whereClause);
+        $selectedColumn = isset($_POST["column_name"]) ? $_POST["column_name"] : '*';
+        // Setting the query variable
+        if(isset($selectedColumn)) {
+            if(!empty(trim($whereClause))) {  //If the where Clause is filled out
+                $sql_query = "DELETE FROM " . $selectedTable;
+                $formattedWhereClause = formatValue($trimmedWhereClause);  // Format
+                $sql_query .= " WHERE ". $selectedColumn . ' = ' . $whereClause;  // Add to query
+            }
+        }
+    }
  ?>
 
  <!-- Creating the Results section -->
@@ -214,7 +270,7 @@ if ($selectedTable !== null) {
     // Get the query result
     if(isset($sql_query)){
         $result = mysqli_query($connection, $sql_query);
-        if(!$result){
+        if($result === false){
             print "❌ Query failed: " . mysqli_error($connection);
         }
         else{
@@ -224,7 +280,7 @@ if ($selectedTable !== null) {
             $tableOutput .= "<thead>";
             $tableOutput .= "<tr>";
             // Add all the column names
-            foreach($table_columns as $col_name){
+            foreach($table_columns as $col_name){  //NOTE: THIS IS WHAT I MUST MODIFY FOR SELECT
                 $tableOutput .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Assign proper name to column
             }
             $tableOutput .= "</tr>";
@@ -242,9 +298,10 @@ if ($selectedTable !== null) {
                     $tableOutput .= "</tr>";
                 }
             }
-            else{  // No results found from the query (should never happen)
+            else{
                 print '<p> ⚠️ No results found. </p>';
                 $empty = true;
+
             }
             $tableOutput .= "</table>";
 
