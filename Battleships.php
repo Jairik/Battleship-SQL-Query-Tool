@@ -154,7 +154,7 @@ if ($selectedTable !== null) {
     $printedInputFields .= '<input type="hidden" name="db_table" value="' . htmlspecialchars($_SESSION['selectedTable'] ?? '') . '">';
     // Looping through each column to create text (label) and input box
     foreach($table_columns as $col_name){
-        $printedInputFields .= "<td><strong>" . htmlspecialchars($col_name) . "</strong></td>"; // Print attribute name
+        $printedInputFields .= "<td><strong>" . htmlspecialchars($col_name) . ": </strong></td>"; // Print attribute name
         $inputName = ((htmlspecialchars($col_name)) . $i);  // Generate unique name for input box
         $printedInputFields .= '<input type="text" name="' . $inputName . '"  placeholder="' . $hint . '">';  // Print input box
         $inputNames .= $inputName;  // Add name to list for POST retrieval later
@@ -172,11 +172,11 @@ if ($selectedTable !== null) {
     if($_SERVER["REQUEST_METHOD"] == "POST"){
         // Check all the attribute input boxes to ensure that 
         $isMissingFields = false;  // Flag to indicate if any fields are missing
-        $validFields = 0;
+        $validFieldCount = 0;
         //NOTE: Loop through and check, changing flag if missing
         foreach($inputNames as $name){
             if(isset($name) && $name != '') {
-                $validFields++;
+                $validFieldCount++;
             }
             else{  // Field is not valid, change flag and break
                 $isMissingFields = true;
@@ -185,18 +185,26 @@ if ($selectedTable !== null) {
         }
         // Setting the query variable
         if(count($inputNames) == $validFields && $isMissingFields == false) {  // Somewhat redundant check
-            $sql_query = "SELECT " . $selectedColumn . " FROM " . $selectedTable;
-            if(isset($whereClause) && $whereClause != "") {  //If the where Clause is filled out
-                $sql_query .= " WHERE ". $whereClause;
+            $sql_query = "INSERT INTO " . $selectedTable . " (";
+            // Adding all the column names to the query
+            foreach($table_columns as $col_name){
+                $sql_query .= $col_name . ", ";
             }
+            $sql_query .= ") VALUES ";
+            // Adding the custom input values
+            foreach($inputNames as $input){
+                $sql_query .= $input . ", ";
+            }
+            $sql_query .= ");";
         }
     }
  ?>
 
  <!-- Creating the DELETE section -->
  <h1>DELETE</h1>
- <?php
 
+ <?php
+    print "DELETE"
  ?>
 
  <!-- Creating the Results section -->
